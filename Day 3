@@ -1,0 +1,16 @@
+### Day 3 — 2026-09-20 · Firewall + isolated lab network (OPNsense)
+
+What I did
+- Created an isolated internal bridge (`vmbr1`) in Proxmox for the lab network — no physical NIC attached, so it's fully segregated.
+- Built a firewall VM with two NICs: WAN on `vmbr0` (home network) and LAN on `vmbr1` (isolated lab).
+- Installed OPNsense (ZFS, single-disk stripe) and set a root password.
+- OPNsense auto-assigned the interfaces: LAN = `192.168.1.1/24`, WAN via DHCP — no conflict with my home subnet (192.168.88.x).
+
+Challenges & fixes
+- First VM start failed: `bridge 'vmbr1' does not exist`. Cause: I created the bridge but didn't click **Apply Configuration** in Proxmox — network changes stay pending until applied.
+- CD boot failed (`Could not read from CDROM`). Cause: I had downloaded the `vga` **`.img`** image (a raw USB image), which isn't a bootable CD. Fixed by downloading the **`dvd` `.iso`** variant instead.
+- Switched from pfSense to OPNsense — the pfSense CE download routes through a store checkout; OPNsense has a direct download and is functionally equivalent for the lab.
+
+What I learned
+- `.img` = raw USB/disk image, `.iso` = bootable CD image — for a VM you need the ISO/dvd variant.
+- The firewall sits *between* two networks: WAN (`vmbr0`, toward the
