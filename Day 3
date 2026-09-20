@@ -4,26 +4,25 @@ What I did
 - Created an isolated internal bridge (vmbr1) in Proxmox for the lab network — no physical NIC attached, so lab traffic is fully segregated at layer 2 and never touches my physical home network.
 - Built a firewall VM with two NICs: WAN on vmbr0 (home network) and LAN on vmbr1(isolated lab).
 - Installed OPNsense (ZFS, single-disk stripe) and set a root password.
-- OPNsense auto-assigned the interfaces: LAN = 192.168.1.1/24, WAN via DHCP — no conflict with my home subnet (192.168.88.x).
+- OPNsense auto-assigned the interfaces: LAN = 192.168.x.1/24, WAN via DHCP — no conflict with my home subnet (192.168.x.x).
 - Reached the web UI from a machine on the LAN side, ran the setup wizard, and set the timezone/DNS.
-- Added the segmentation rule: a HomeLan alias (192.168.88.0/24) plus a *Block* rule on the LAN interface (`LAN net → HomeLan`), placed above the default allow rule, then Applied.
+- Added the segmentation rule: a HomeLan alias (192.168.x.0/24) plus a Block rule on the LAN interface (`LAN net → HomeLan`), placed above the default allow rule, then Applied.
 
 Challenges & fixes
 - The two NICs came up *swapped* (WAN had no IP, and the lab got no DHCP). Fixed by matching driver names to bridges: VirtIO = WAN → vmbr0, Intel E1000 = LAN → vmbr1.
 - The block rule appeared to do nothing at first. Two reasons: it must sit "above" the default "allow LAN to any" (first match wins, top-down), and network/firewall changes only take effect after Apply. I'd also entered the second network in the *Description* field instead of as its own route/alias entry.
 - The OPNsense web GUI isn't reachable from the WAN side by default (a deliberate security control) — I had to reach it from a host on the LAN.
 
-**What I learned**
-- `.img` = raw USB/disk image, `.iso` = bootable CD image — for a VM you need the ISO/dvd variant.
-- The firewall sits between two networks: WAN (vmbr0, toward the internet and my home LAN) and LAN (vmbr1, the isolated lab). It is the *only* path in or out of the lab, which is exactly why the firewall rules matter — a router forwards everything by default unless a rule says otherwise.
+What I learned
+- The firewall sits between two networks: WAN (vmbr0, toward the internet and my home LAN) and LAN (vmbr1, the isolated lab). It is the only path in or out of the lab, which is exactly why the firewall rules matter — a router forwards everything by default unless a rule says otherwise.
 - Segmentation is really two layers: L2 (the isolated bridge with no uplink, so lab traffic can't physically leave the host) and L3 (the firewall rule that stops the lab from routing to my home devices). Both together = real isolation.
 - The lab still reaches the internet on purpose (through OPNsense via NAT), so I can update machines — while being blocked from my home LAN. That controlled-egress design is the point.
 
 
 Verification
-- From the lab: `ping 192.168.88.1` → blocked (times out) — the lab can't reach home devices.
+- From the lab: `ping 192.168.x.1` → blocked (times out) — the lab can't reach home devices.
 - From the lab: `ping 8.8.8.8` → works — internet egress is intact.
-- From my home PC: the lab hosts (`192.168.1.x`) are unreachable — inbound is blocked by NAT + the WAN default-deny.
+- From my home PC: the lab hosts (`192.168.x.x`) are unreachable — inbound is blocked by NAT + the WAN default-deny.
 
 Next
 - Add the attacker box (Kali) on `vmbr1` and use it to reach the OPNsense GUI and start scanning.
