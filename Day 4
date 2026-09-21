@@ -1,0 +1,31 @@
+### Day 4 — 2026-09-21 · First vulnerable target + first attack chain (Metasploitable 2, DVWA)
+
+What I did
+- Imported Metasploitable 2 (an intentionally vulnerable Linux box) onto the isolated lab bridge (vmbr1) — never on my home network. It only ever lives behind OPNsense on the segmented net.
+- Attached its disk as IDE and its NIC as Intel E1000 (not VirtIO), set the boot order to the imported disk, booted it, and logged in (msfadmin).
+- Confirmed it pulled a DHCP lease from OPNsense on the lab net (192.168.x.123) — proof it's correctly on vmbr1.
+- Recon from Kali: `nmap -sV 192.168.x.123` mapped a large attack surface — FTP, SSH, Telnet, SMB, MySQL, PostgreSQL, Tomcat, IRC, the r-services and more — each with its exact service version.
+- Exploit 1 — vsftpd 2.3.4 backdoor, by hand: `nc` to the FTP port, sent a username ending in `:)` to trip the backdoor, then a second `nc` to port 6200 dropped straight into a passwordless root shell.
+- Exploit 2 — SQL injection on DVWA (security = Low): confirmed the injection point with a single `'`, dumped every user with `' OR '1'='1`, then pulled credentials with `' UNION SELECT user, password FROM users #`. Extracted the MD5 password hashes and covered how offline cracking works (guess → hash → compare against rockyou.txt).
+
+Challenges & fixes
+- Metasploitable's 2008-era kernel has no VirtIO drivers, so a VirtIO disk/NIC wouldn't boot or wouldn't get a link. Fixed by attaching the disk as IDE and the NIC as Intel E1000.
+- SSH brute force hit a crypto wall: modern Kali's SSH client has dropped the weak KEX/MAC algorithms that Metasploitable's OpenSSH 4.7 only speaks, so the handshake fails before any password is even tried. Worked around it with explicit legacy options (`-oKexAlgorithms=+diffie-hellman-group1-sha1 -oMACs=+hmac-sha1 -oHostKeyAlgorithms=+ssh-rsa -oCiphers=+aes128-cbc`).
+- The noVNC console uses a US keymap, which kept mangling special characters (quotes, pipes, dashes). Used the console Clipboard panel and character-light commands to work around it.
+
+What I learned
+- The methodology transfers even when the specific vulnerability is ancient: recon → find a weak point → exploit → prove access is the same everywhere. The CVE changes; the process doesn't.
+- The vsftpd backdoor is the textbook ancestor of modern supply-chain attacks (malicious code slipped into an official download) — the same class as SolarWinds and the 2024 XZ Utils backdoor.
+- SQL injection's root cause is an app that doesn't separate data from commands: my input got glued straight into the query, so I could break out of the "data" and inject a command. A verbose SQL error is itself an information-disclosure bug. The fix is parameterized queries (prepared statements).
+- Hashing: weak passwords behind a fast, unsalted algorithm (MD5) fall in seconds — you don't reverse the hash, you guess-and-compare. Defense is long unique passwords behind a slow, salted hash (bcrypt/argon2).
+
+Verification
+- `nmap -sV 192.168.x.123` returned open ports and service versions → the target is live, and only on the lab net.
+- vsftpd backdoor: the second `nc` to port 6200 returned `uid=0(root)` and could read /etc/shadow → confirmed full root.
+- SQLi: `' OR '1'='1` returned the entire user table; `' UNION SELECT ...` returned usernames plus their password hashes.
+- Isolation still holds: the target is reachable from Kali on vmbr1, but not from my home network.
+
+Next
+- Switch to the defender side: stand up a Wazuh SIEM and replay today's attacks (backdoor, brute force, SQL injection) to see how they show up in the logs — then tune detection.
+
+![alt text]({F204B793-A9C0-4597-8706-6196D6BF4989}.png)

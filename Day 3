@@ -26,3 +26,4 @@ Verification
 
 Next
 - Add the attacker box (Kali) on `vmbr1` and use it to reach the OPNsense GUI and start scanning.
+
