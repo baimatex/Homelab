@@ -1,0 +1,45 @@
+Homelab update — the SIEM is live
+
+Second milestone on the cybersecurity homelab. The last update got the foundation running Proxmox on a mini PC (an old i5-7500T with 32GB of RAM), the network wired up, and the whole lab sealed behind pfSense on its own isolated segment so nothing in here can reach the internet or my home network. This round is about giving the lab something worth defending — and something attacking it.
+
+What this update adds
+A deliberately vulnerable VM as the first target.
+Wazuh stood up as the SIEM (manager + dashboard), with agents reporting from the targets.
+A first end-to-end test: run an attack, then go read it from the defender's side in the logs.
+Current architecture
+          [ Internet ]  — blocked —  [ Home network ]
+                                |
+                           [ pfSense ]
+                                |
+                    isolated lab segment (no egress)
+                     |            |              |
+             [ Vulnerable VM ]  [ Wazuh manager ]  [ attacker box ]
+                   (agent) ----------> (SIEM / dashboard)
+
+Everything lives on the Proxmox host; pfSense is the only thing deciding what may talk to what, and the lab segment has no path out.
+
+The build, this round
+
+Standing up Wazuh was the straightforward part — manager and dashboard up, agent installed on the target. The part that actually taught me something was getting the agent to reach the manager. The pfSense segmentation I was so pleased about in the last post happily blocked my own monitoring traffic until I went back and opened the right path for it. A good reminder that "deny by default" cuts both ways: the defender has to explicitly allow the things the defense itself depends on.
+
+The vulnerable target gave the SIEM something real to report on, rather than just the hum of a quiet host.
+
+First attack → detection
+
+This was the part I'd been waiting for since the last post. I attacked one of the boxes, then switched over to the Wazuh dashboard to see what the whole thing looked like from the defender's chair.
+
+ A quick SSH brute-force against the target. Within seconds, failed-login alerts were stacking up in Wazuh, all tied back to a single source IP, with the rule that fired and a timeline of the attempts.
+
+That flip in perspective is the whole point of the lab. Running the attack is one thing; seeing the trail it leaves — the alerts, the timeline, the noise around the one event that actually matters — is what makes the defensive side concrete. "Detection" stopped being a diagram and became a list of things I had to go and find.
+
+What I took away
+Segmentation protects the defender's own tooling too — plan the monitoring paths deliberately, not as an afterthought.
+Raw alerts are not the same as understanding. Reading the attack back in the logs is a skill in itself.
+An attack you can't see in your logs may as well have succeeded.
+Next steps
+Add more vulnerable targets with a wider range of services.
+Tune the Wazuh rules so the signal isn't buried in noise.
+Try a quieter attack to see what slips past the current detection.
+Stack
+
+Proxmox VE · pfSense · Wazuh · [vulnerable target OS/box] · [attacker toolkit]
